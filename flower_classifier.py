@@ -57,7 +57,13 @@ class FlowerDataset:
         
         for img_path, label in self.samples:
             try:
-                image = Image.open(img_path).convert('RGB')
+                image = Image.open(img_path)
+                # Manejar imágenes con paleta de colores y transparencia
+                if image.mode == 'P' and 'transparency' in image.info:
+                    image = image.convert('RGBA')
+                # Convertir a RGB
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
             except:
                 # Crear imagen de respaldo si falla la carga
                 image = Image.new('RGB', (224, 224), color=(128, 128, 128))
@@ -120,6 +126,15 @@ class FlowerClassifier:
         Returns:
             Array de numpy normalizado
         """
+        # Manejar imágenes con paleta de colores y transparencia
+        # Esto elimina el warning de PIL sobre "Palette images with Transparency"
+        if image.mode == 'P' and 'transparency' in image.info:
+            image = image.convert('RGBA')
+        
+        # Asegurar que la imagen esté en RGB (sin canal alpha)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
         # Redimensionar al tamaño correcto del modelo
         image = image.resize((self.input_size, self.input_size))
         
@@ -254,9 +269,15 @@ class FlowerClassifier:
         # Cargar imagen si es una ruta
         if isinstance(image, str):
             try:
-                image = Image.open(image).convert('RGB')
-            except:
-                Logger.log("Error cargando imagen para predicción", "ERROR")
+                image = Image.open(image)
+                # Manejar imágenes con paleta de colores y transparencia
+                if image.mode == 'P' and 'transparency' in image.info:
+                    image = image.convert('RGBA')
+                # Convertir a RGB
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+            except Exception as e:
+                Logger.log(f"Error cargando imagen para predicción: {e}", "ERROR")
                 return "unknown", 0.0
         
         # Preprocesar
@@ -270,14 +291,18 @@ class FlowerClassifier:
         
         # Determinar si el modelo tiene salida binaria (1 neurona) o multiclase (2+ neuronas)
         if predictions.shape[-1] == 1:
-            # Modelo binario con sigmoid (0 = flor, > 0.5 = objeto)
+            # Modelo binario con sigmoid
+            # IMPORTANTE: El modelo fue entrenado con 0=objeto, 1=flor
+            # Por lo tanto, valores altos (>0.5) = flor, valores bajos (<0.5) = objeto
             confidence = float(predictions[0][0])
             if confidence > 0.5:
-                predicted_label = 'objeto'
+                # Valor alto = flor (CORREGIDO)
+                predicted_label = 'flor'
                 confidence = confidence  # Ya está normalizado
             else:
-                predicted_label = 'flor'
-                confidence = 1.0 - confidence  # Invertir para mostrar confianza en 'flor'
+                # Valor bajo = objeto (CORREGIDO)
+                predicted_label = 'objeto'
+                confidence = 1.0 - confidence  # Invertir para mostrar confianza en 'objeto'
         else:
             # Modelo multiclase con softmax
             predicted_class = np.argmax(predictions[0])

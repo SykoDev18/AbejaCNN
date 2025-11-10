@@ -305,3 +305,116 @@ def get_neighbors(position, grid_size):
             neighbors.append((nx, ny))
     
     return neighbors
+
+
+# Variable global para mantener referencia a la última ventana abierta
+_last_processing_window = None
+
+
+def show_image_processing_demo(image_path, duration=5):
+    """
+    Muestra una ventana emergente con las técnicas de procesamiento aplicadas.
+    Se cierra automáticamente después del tiempo especificado.
+    Cierra la ventana anterior si existe.
+    
+    Args:
+        image_path: Ruta a la imagen a procesar
+        duration: Tiempo en segundos antes de cerrar (default: 5)
+    """
+    import matplotlib
+    matplotlib.use('TkAgg')  # Backend para ventanas no bloqueantes
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import Figure
+    import threading
+    
+    global _last_processing_window
+    
+    try:
+        # Cerrar la ventana anterior si existe
+        if _last_processing_window is not None:
+            try:
+                plt.close(_last_processing_window)
+                Logger.log("Ventana anterior cerrada")
+            except:
+                pass
+        
+        # Cargar imagen original
+        original_image = Image.open(image_path)
+        if original_image.mode == 'P' and 'transparency' in original_image.info:
+            original_image = original_image.convert('RGBA')
+        if original_image.mode != 'RGB':
+            original_image = original_image.convert('RGB')
+        
+        # Aplicar técnicas de procesamiento
+        techniques = {
+            'Original': original_image,
+            'Ecualización\nGlobal': ImageProcessor.equalize_histogram_global(original_image),
+            'CLAHE\n(Adaptativa)': ImageProcessor.equalize_histogram_adaptive(original_image),
+            'Contraste\nMejorado': ImageProcessor.enhance_contrast(original_image, factor=1.5),
+            'Subexpuesta': ImageProcessor.create_underexposed(original_image, factor=0.6),
+            'Sobreexpuesta': ImageProcessor.create_overexposed(original_image, factor=1.4),
+        }
+        
+        # Crear figura
+        fig, axes = plt.subplots(2, 3, figsize=(12, 7))
+        fig.canvas.manager.set_window_title('🔬 Procesamiento de Imagen Detectada')
+        fig.suptitle('🔬 Técnicas de Procesamiento Aplicadas en Tiempo Real', 
+                     fontsize=14, fontweight='bold')
+        
+        axes = axes.ravel()
+        
+        # Mostrar imágenes
+        for idx, (name, img) in enumerate(techniques.items()):
+            axes[idx].imshow(img)
+            axes[idx].set_title(name, fontsize=10, fontweight='bold')
+            axes[idx].axis('off')
+            
+            # Agregar métricas
+            metrics = ImageProcessor.calculate_metrics(img)
+            text = f"Contraste: {metrics['contrast']:.1f}\n"
+            text += f"Entropía: {metrics['entropy']:.1f}\n"
+            text += f"Brillo: {metrics['brightness']:.1f}"
+            
+            axes[idx].text(0.02, 0.98, text, 
+                    transform=axes[idx].transAxes,
+                    verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.7),
+                    fontsize=8)
+        
+        # Agregar contador de tiempo
+        filename = os.path.basename(image_path)
+        fig.text(0.5, 0.02, f'📸 Imagen: {filename} | ⏰ Se cerrará en {duration} segundos', 
+                ha='center', fontsize=10, style='italic', 
+                bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+        
+        plt.tight_layout(rect=[0, 0.03, 1, 0.96])
+        
+        # Guardar referencia a esta ventana
+        _last_processing_window = fig
+        
+        # Cerrar automáticamente después del tiempo especificado
+        def close_window():
+            import time
+            time.sleep(duration)
+            try:
+                plt.close(fig)
+                global _last_processing_window
+                if _last_processing_window == fig:
+                    _last_processing_window = None
+            except:
+                pass
+        
+        # Iniciar timer en thread separado
+        timer_thread = threading.Thread(target=close_window, daemon=True)
+        timer_thread.start()
+        
+        # Mostrar ventana (no bloqueante)
+        plt.show(block=False)
+        plt.pause(0.1)  # Pequeña pausa para que se renderice
+        
+        Logger.log(f"🔬 Ventana de procesamiento mostrada por {duration} segundos")
+        
+    except Exception as e:
+        Logger.log(f"Error mostrando demo de procesamiento: {e}", "ERROR")
+        import traceback
+        traceback.print_exc()

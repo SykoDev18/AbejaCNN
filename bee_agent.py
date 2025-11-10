@@ -4,7 +4,7 @@ Maneja el movimiento, detección de celdas e interacción con el clasificador.
 """
 import time
 from config import *
-from utils import Logger, load_random_flower_test_image, load_random_object_image
+from utils import Logger, load_random_flower_test_image, load_random_object_image, show_image_processing_demo
 
 
 class BeeAgent:
@@ -93,6 +93,11 @@ class BeeAgent:
                 Logger.log(f"Clasificando imagen: {image_path}")
                 classification, confidence = self.classifier.predict(image_path)
                 Logger.log(f"Resultado: {classification} con confianza {confidence:.2f}")
+                
+                # ✨ MOSTRAR VENTANA DE PROCESAMIENTO EN TIEMPO REAL ✨
+                Logger.log("Mostrando técnicas de procesamiento aplicadas...")
+                show_image_processing_demo(image_path, duration=5)
+                
             except Exception as e:
                 Logger.log(f"Error clasificando imagen {image_path}: {e}", "ERROR")
                 import traceback
